@@ -1,35 +1,52 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  // Создаем "коробки" для хранения данных из полей ввода
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [link, setLink] = useState('');
+
+  // Эта функция будет вызываться при нажатии на кнопку "Сохранить"
+  const handleSave = () => {
+    // Пока что просто покажем alert с данными.
+    // В будущем здесь будет отправка на сервер.
+    const message = `Имя: ${name}\nО себе: ${bio}\nСсылка: ${link}`;
+    alert(message);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="form-container">
+      <h1>Редактор страницы</h1>
+
+      <label>Ваше имя или никнейм</label>
+      <input
+        type="text"
+        placeholder="Введите ваше имя"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
+
+      <label>Коротко о себе</label>
+      <textarea
+        placeholder="Чем вы увлекаетесь?"
+        value={bio}
+        onChange={(e) => setBio(e.target.value)}
+      />
+
+      <label>Важная ссылка</label>
+      <input
+        type="text"
+        placeholder="https://t.me/username"
+        value={link}
+        onChange={(e) => setLink(e.target.value)}
+      />
+
+      <button onClick={handleSave}>
+        Сохранить
+      </button>
+    </div>
+  );
 }
 
-export default App
+export default App;
