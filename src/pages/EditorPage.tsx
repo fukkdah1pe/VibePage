@@ -1,101 +1,78 @@
-// src/pages/EditorPage.tsx - Финальная версия с интеграцией Telegram
+// src/pages/EditorPage.tsx - ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ
 
-// Эта строчка - "подсказка" для TypeScript, что мы работаем с Telegram Web App
 /// <reference types="@twa-dev/types" />
-
-import { useState, useEffect } from 'react'; // Добавили useEffect
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 function EditorPage() {
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
-  const [link, setLink] = useState('');
-  const [loading, setLoading] = useState(true); // Состояние для отслеживания загрузки
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
-  // Получаем главный объект для работы с Telegram
-  const tg = window.Telegram.WebApp;
+  // Функция для добавления записей в наш лог
+  const addLog = (message: string) => {
+    setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
 
-  // Получаем ID пользователя. Если мы не в Telegram, то userId будет undefined
-  const userId = tg.initDataUnsafe?.user?.id.toString();
-
-  // useEffect будет выполняться один раз при загрузке компонента
   useEffect(() => {
-    // Расширяем приложение на весь экран при запуске
+    addLog("Приложение запущено.");
+
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+      addLog("Критическая ошибка: window.Telegram.WebApp не найден!");
+      return;
+    }
+    addLog("Объект Telegram.WebApp найден.");
     tg.expand();
 
-    // Функция для загрузки данных пользователя из Supabase
-    const fetchUserData = async () => {
-      if (!userId) {
-        setLoading(false);
-        console.log("Приложение открыто не в Telegram, загрузка данных невозможна.");
-        return;
-      }
+    const userId = tg.initDataUnsafe?.user?.id.toString();
+    addLog(`ID пользователя: ${userId || "не определен"}`);
 
-      const { data, error } = await supabase
-        .from('pages')
-        .select('name, bio, link')
-        .eq('user_id', userId)
-        .single();
-
-      if (data) {
-        // Если данные нашлись, заполняем ими поля
-        setName(data.name || '');
-        setBio(data.bio || '');
-        setLink(data.link || '');
-      }
-      
-      if (error && error.code !== 'PGRST116') { // PGRST116 - это код ошибки "строка не найдена", это не страшно
-          console.error("Ошибка загрузки данных:", error);
-      }
-      
-      setLoading(false); // Завершаем загрузку
-    };
-
-    fetchUserData();
-  }, [userId]); // Пустой массив зависимостей означает, что эффект выполнится один раз
-
-  const handleSave = async () => {
-    // Проверяем, есть ли у нас ID пользователя
     if (!userId) {
-      alert('Ошибка: невозможно определить пользователя. Откройте приложение через Telegram.');
+      addLog("Загрузка данных невозможна без ID пользователя.");
       return;
     }
 
-    const { error } = await supabase
-      .from('pages')
-      .upsert({ user_id: userId, name, bio, link }); // <-- Используем настоящий userId!
+    const fetchUserData = async () => {
+      addLog("Начинаю загрузку данных из Supabase...");
+      try {
+        const { data, error } = await supabase
+          .from('pages')
+          .select('name, bio, link')
+          .eq('user_id', userId)
+          .single();
 
-    if (error) {
-      tg.showAlert('Ошибка сохранения: ' + error.message); // Используем нативное уведомление
-    } else {
-      tg.showAlert('Ваша страница успешно сохранена!'); // Используем нативное уведомление
-    }
-  };
+        if (error) {
+          // PGRST116 - это нормальная ошибка "строка не найдена"
+          if (error.code === 'PGRST116') {
+             addLog("Данные для этого пользователя еще не созданы. Это нормально.");
+          } else {
+             // А вот другие ошибки - это проблема
+             throw error;
+          }
+        }
+        
+        if (data) {
+          addLog("Данные успешно загружены!");
+        }
 
-  // Пока данные грузятся, показываем заглушку
-  if (loading) {
-    return <div className="container"><h1>Загрузка профиля...</h1></div>;
-  }
+      } catch (err: any) {
+        addLog(`!!! ОШИБКА SUPABASE: ${err.message}`);
+      } finally {
+        addLog("Процесс загрузки завершен.");
+      }
+    };
 
-  // Основной JSX остается почти без изменений
+    fetchUserData();
+  }, []);
+
   return (
-    <div className="container">
-      <h1>Редактор вашей страницы</h1>
-      <div className="form-group">
-        <label>Имя или никнейм</label>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ваше имя"/>
-      </div>
-      <div className="form-group">
-        <label>О себе</label>
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите немного о себе"/>
-      </div>
-      <div className="form-group">
-        <label>Ссылка</label>
-        <input type="text" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ваша главная ссылка"/>
-      </div>
-      <button onClick={handleSave} className="save-button">
-        Сохранить
-      </button>
+    <div style={{ padding: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+      <h1>Диагностика</h1>
+      {/* Выводим наш лог на экран */}
+      {debugLog.map((log, index) => (
+        <p key={index} style={{ margin: 0, borderBottom: '1px solid #eee' }}>{log}</p>
+      ))}
+      <hr />
+      <p>Если вы видите этот текст, значит React работает. Пришлите скриншот этого экрана.</p>
     </div>
   );
 }
