@@ -1,60 +1,101 @@
-// src/pages/EditorPage.tsx - ФИНАЛЬНАЯ ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ (С ОЖИДАНИЕМ)
+// src/pages/EditorPage.tsx - ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ
 
 /// <reference types="@twa-dev/types" />
 import { useState, useEffect } from 'react';
-//import { supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient'; // <-- РАСКОММЕНТИРОВАЛИ ОБРАТНО!
 
 function EditorPage() {
-  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
+  const [link, setLink] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const addLog = (message: string) => {
-    setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
-  };
-
+  // Используем useEffect, чтобы код выполнился один раз при запуске
   useEffect(() => {
-    addLog("Приложение запущено.");
-
-    // Функция, которая будет пытаться инициализировать приложение
-    const initializeApp = (attempt = 1) => {
+    const initializeApp = () => {
       const tg = window.Telegram?.WebApp;
-
-      if (tg) {
-        // УСПЕХ! Объект найден
-        addLog(`Успех! Объект Telegram.WebApp найден с ${attempt} попытки.`);
-        tg.expand();
-
-        const userId = tg.initDataUnsafe?.user?.id.toString();
-        addLog(`ID пользователя: ${userId || "не определен"}`);
-
-        if (!userId) {
-            addLog("Загрузка данных невозможна без ID пользователя.");
-            return;
-        }
-        
-        // ... (остальная логика загрузки данных останется здесь, когда мы вернемся к ней)
-        addLog("Приложение готово к работе!");
-
-      } else {
-        // ОБЪЕКТ НЕ НАЙДЕН. Пробуем еще раз через 100 миллисекунд
-        if (attempt > 30) { // Если за 3 секунды объект не появился - что-то не так
-          addLog("Критическая ошибка: Telegram.WebApp не появился после 3 секунд ожидания.");
-          return;
-        }
-        addLog(`Попытка #${attempt}: Telegram.WebApp еще не готов. Жду 100мс...`);
-        setTimeout(() => initializeApp(attempt + 1), 100);
+      if (!tg) {
+        console.error("Telegram WebApp object is not available.");
+        setLoading(false);
+        return;
       }
+
+      tg.expand();
+      const userId = tg.initDataUnsafe?.user?.id.toString();
+
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      // Загружаем данные пользователя
+      const fetchUserData = async () => {
+        const { data } = await supabase
+          .from('pages')
+          .select('name, bio, link')
+          .eq('user_id', userId)
+          .single();
+
+        if (data) {
+          setName(data.name || '');
+          setBio(data.bio || '');
+          setLink(data.link || '');
+        }
+        setLoading(false);
+      };
+
+      fetchUserData();
     };
 
-    initializeApp(); // Начинаем процесс инициализации
-
+    // Терпеливо ждем, пока объект Telegram не появится
+    if (window.Telegram?.WebApp) {
+      initializeApp();
+    } else {
+      setTimeout(initializeApp, 100);
+    }
   }, []);
 
+  const handleSave = async () => {
+    const tg = window.Telegram.WebApp;
+    const userId = tg.initDataUnsafe?.user?.id.toString();
+    if (!userId) {
+      tg.showAlert('Ошибка: невозможно определить пользователя.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('pages')
+      .upsert({ user_id: userId, name, bio, link });
+
+    if (error) {
+      tg.showAlert('Ошибка сохранения: ' + error.message);
+    } else {
+      tg.showAlert('Ваша страница успешно сохранена!');
+    }
+  };
+
+  if (loading) {
+    return <div className="container"><h1>Загрузка...</h1></div>;
+  }
+
   return (
-    <div style={{ padding: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-      <h1>Диагностика (с ожиданием)</h1>
-      {debugLog.map((log, index) => (
-        <p key={index} style={{ margin: 0, borderBottom: '1px solid #eee' }}>{log}</p>
-      ))}
+    <div className="container">
+      <h1>Редактор вашей страницы</h1>
+      <div className="form-group">
+        <label>Имя или никнейм</label>
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ваше имя"/>
+      </div>
+      <div className="form-group">
+        <label>О себе</label>
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Расскажите немного о себе"/>
+      </div>
+      <div className="form-group">
+        <label>Ссылка</label>
+        <input type="text" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ваша главная ссылка"/>
+      </div>
+      <button onClick={handleSave} className="save-button">
+        Сохранить
+      </button>
     </div>
   );
 }
