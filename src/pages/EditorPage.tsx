@@ -1,4 +1,4 @@
-// src/pages/EditorPage.tsx - ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ
+// src/pages/EditorPage.tsx - ФИНАЛЬНАЯ ДИАГНОСТИЧЕСКАЯ ВЕРСИЯ (С ОЖИДАНИЕМ)
 
 /// <reference types="@twa-dev/types" />
 import { useState, useEffect } from 'react';
@@ -7,7 +7,6 @@ import { supabase } from '../supabaseClient';
 function EditorPage() {
   const [debugLog, setDebugLog] = useState<string[]>([]);
 
-  // Функция для добавления записей в наш лог
   const addLog = (message: string) => {
     setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
@@ -15,64 +14,47 @@ function EditorPage() {
   useEffect(() => {
     addLog("Приложение запущено.");
 
-    const tg = window.Telegram?.WebApp;
-    if (!tg) {
-      addLog("Критическая ошибка: window.Telegram.WebApp не найден!");
-      return;
-    }
-    addLog("Объект Telegram.WebApp найден.");
-    tg.expand();
+    // Функция, которая будет пытаться инициализировать приложение
+    const initializeApp = (attempt = 1) => {
+      const tg = window.Telegram?.WebApp;
 
-    const userId = tg.initDataUnsafe?.user?.id.toString();
-    addLog(`ID пользователя: ${userId || "не определен"}`);
+      if (tg) {
+        // УСПЕХ! Объект найден
+        addLog(`Успех! Объект Telegram.WebApp найден с ${attempt} попытки.`);
+        tg.expand();
 
-    if (!userId) {
-      addLog("Загрузка данных невозможна без ID пользователя.");
-      return;
-    }
+        const userId = tg.initDataUnsafe?.user?.id.toString();
+        addLog(`ID пользователя: ${userId || "не определен"}`);
 
-    const fetchUserData = async () => {
-      addLog("Начинаю загрузку данных из Supabase...");
-      try {
-        const { data, error } = await supabase
-          .from('pages')
-          .select('name, bio, link')
-          .eq('user_id', userId)
-          .single();
-
-        if (error) {
-          // PGRST116 - это нормальная ошибка "строка не найдена"
-          if (error.code === 'PGRST116') {
-             addLog("Данные для этого пользователя еще не созданы. Это нормально.");
-          } else {
-             // А вот другие ошибки - это проблема
-             throw error;
-          }
+        if (!userId) {
+            addLog("Загрузка данных невозможна без ID пользователя.");
+            return;
         }
         
-        if (data) {
-          addLog("Данные успешно загружены!");
-        }
+        // ... (остальная логика загрузки данных останется здесь, когда мы вернемся к ней)
+        addLog("Приложение готово к работе!");
 
-      } catch (err: any) {
-        addLog(`!!! ОШИБКА SUPABASE: ${err.message}`);
-      } finally {
-        addLog("Процесс загрузки завершен.");
+      } else {
+        // ОБЪЕКТ НЕ НАЙДЕН. Пробуем еще раз через 100 миллисекунд
+        if (attempt > 30) { // Если за 3 секунды объект не появился - что-то не так
+          addLog("Критическая ошибка: Telegram.WebApp не появился после 3 секунд ожидания.");
+          return;
+        }
+        addLog(`Попытка #${attempt}: Telegram.WebApp еще не готов. Жду 100мс...`);
+        setTimeout(() => initializeApp(attempt + 1), 100);
       }
     };
 
-    fetchUserData();
+    initializeApp(); // Начинаем процесс инициализации
+
   }, []);
 
   return (
     <div style={{ padding: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-      <h1>Диагностика</h1>
-      {/* Выводим наш лог на экран */}
+      <h1>Диагностика (с ожиданием)</h1>
       {debugLog.map((log, index) => (
         <p key={index} style={{ margin: 0, borderBottom: '1px solid #eee' }}>{log}</p>
       ))}
-      <hr />
-      <p>Если вы видите этот текст, значит React работает. Пришлите скриншот этого экрана.</p>
     </div>
   );
 }
