@@ -2,7 +2,7 @@
 
 /// <reference types="@twa-dev/types" />
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+//import { supabase } from '../supabaseClient';
 
 function EditorPage() {
   const [debugLog, setDebugLog] = useState<string[]>([]);
